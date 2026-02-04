@@ -1,0 +1,27 @@
+{
+  "name": "hvac-insights",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dashboard": "tsx src/server.ts",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.72.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.2.0",
+    "@types/node-cron": "^3.0.11",
+    "better-sqlite3": "^12.6.2",
+    "node-cron": "^4.2.1",
+    "puppeteer": "^24.36.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
