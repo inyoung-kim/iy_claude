@@ -1,6 +1,15 @@
+export interface InsightDetail {
+  title: string;
+  summary: string;
+  details: string[];
+  relatedPosts: { title: string; subreddit: string; score: number; url: string }[];
+  actionItems: string[];
+}
+
 export interface DailyInsight {
   summary: string;
   keyInsights: string[];
+  keyInsightDetails?: InsightDetail[];
   trendingTopics: string[];
   sentimentAnalysis: {
     overall: string;
@@ -229,24 +238,154 @@ function performDeepAnalysis(posts: any[]): DailyInsight {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3);
 
+  // 관련 게시물 찾기 헬퍼 함수
+  function findRelatedPosts(keywords: RegExp, limit: number = 5) {
+    return posts
+      .filter(p => keywords.test(`${p.title} ${p.content || ''}`))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(p => ({
+        title: p.title.substring(0, 80) + (p.title.length > 80 ? '...' : ''),
+        subreddit: p.subreddit,
+        score: p.score,
+        url: p.url
+      }));
+  }
+
   // 인사이트 생성
   const keyInsights: string[] = [];
+  const keyInsightDetails: InsightDetail[] = [];
 
+  // 1. 고객 불만 인사이트
   if (topPainPoints.length > 0) {
+    const painCategory = topPainPoints[0].split(' (')[0];
     keyInsights.push(`고객 주요 불만: ${topPainPoints[0]}`);
+
+    const painPattern = PAIN_POINT_PATTERNS.find(p => p.category === painCategory)?.pattern || /problem|issue/gi;
+    const relatedPosts = findRelatedPosts(painPattern);
+
+    keyInsightDetails.push({
+      title: `고객 주요 불만: ${painCategory}`,
+      summary: `${painCategory} 관련 불만이 가장 많이 언급되었습니다. 이는 제품/서비스 개선의 핵심 영역입니다.`,
+      details: [
+        `총 ${painPointCounts[painCategory]}건의 관련 언급 발견`,
+        `전체 불만 카테고리 중 1위`,
+        ...topPainPoints.slice(1, 4).map((p, i) => `${i + 2}위: ${p}`)
+      ],
+      relatedPosts,
+      actionItems: [
+        `${painCategory} 해결을 위한 제품 개선 검토`,
+        '고객 지원 프로세스 강화',
+        '관련 FAQ 및 가이드 제작'
+      ]
+    });
   }
+
+  // 2. 고객 니즈 인사이트
   if (topNeeds.length > 0) {
+    const needCategory = topNeeds[0].split(' (')[0];
     keyInsights.push(`고객 주요 니즈: ${topNeeds[0]}`);
+
+    const needPattern = NEED_PATTERNS.find(p => p.category === needCategory)?.pattern || /want|need/gi;
+    const relatedPosts = findRelatedPosts(needPattern);
+
+    keyInsightDetails.push({
+      title: `고객 주요 니즈: ${needCategory}`,
+      summary: `고객들이 가장 원하는 것은 "${needCategory}"입니다. 이 니즈를 충족시키는 것이 경쟁력의 핵심입니다.`,
+      details: [
+        `총 ${needCounts[needCategory]}건의 관련 언급 발견`,
+        `전체 니즈 카테고리 중 1위`,
+        ...topNeeds.slice(1, 4).map((n, i) => `${i + 2}위: ${n}`)
+      ],
+      relatedPosts,
+      actionItems: [
+        `${needCategory} 관련 기능/서비스 강화`,
+        '마케팅 메시지에 해당 니즈 반영',
+        '경쟁사 대비 차별화 포인트로 활용'
+      ]
+    });
   }
+
+  // 3. 브랜드 인사이트
   if (brandMentions.length > 0) {
     const topBrand = brandMentions[0];
     keyInsights.push(`가장 많이 언급된 브랜드: ${topBrand.brand} (${topBrand.mentions}회, ${topBrand.sentiment === 'positive' ? '긍정적' : topBrand.sentiment === 'negative' ? '부정적' : '중립적'} 평가)`);
+
+    const brandPattern = new RegExp(topBrand.brand, 'gi');
+    const relatedPosts = findRelatedPosts(brandPattern);
+
+    keyInsightDetails.push({
+      title: `브랜드 분석: ${topBrand.brand}`,
+      summary: `${topBrand.brand}가 커뮤니티에서 가장 많이 언급되고 있으며, 전반적으로 ${topBrand.sentiment === 'positive' ? '긍정적' : topBrand.sentiment === 'negative' ? '부정적' : '중립적'}인 평가를 받고 있습니다.`,
+      details: [
+        `총 ${topBrand.mentions}회 언급`,
+        `감성 분석 결과: ${topBrand.sentiment === 'positive' ? '긍정적' : topBrand.sentiment === 'negative' ? '부정적' : '중립적'}`,
+        ...brandMentions.slice(1, 5).map((b, i) => `${i + 2}위: ${b.brand} (${b.mentions}회, ${b.sentiment === 'positive' ? '긍정' : b.sentiment === 'negative' ? '부정' : '중립'})`)
+      ],
+      relatedPosts,
+      actionItems: [
+        `${topBrand.brand}의 강점/약점 벤치마킹`,
+        '경쟁 브랜드 대비 포지셔닝 전략 수립',
+        '브랜드 인지도 향상 방안 검토'
+      ]
+    });
   }
+
+  // 4. 기술 트렌드 인사이트
   if (trendingTopics.length > 0) {
     keyInsights.push(`주목받는 기술 트렌드: ${trendingTopics.slice(0, 2).join(', ')}`);
+
+    const topTopic = trendingTopics[0];
+    const topicPattern = topicPatterns[topTopic] || /technology|tech/gi;
+    const relatedPosts = findRelatedPosts(topicPattern);
+
+    keyInsightDetails.push({
+      title: `기술 트렌드: ${topTopic}`,
+      summary: `"${topTopic}"이 현재 HVAC 커뮤니티에서 가장 주목받는 기술 트렌드입니다.`,
+      details: [
+        `${topTopic} 관련 ${topicCounts.find(t => t.topic === topTopic)?.count || 0}건 언급`,
+        ...topicCounts.slice(0, 4).map((t, i) => `${i + 1}위: ${t.topic} (${t.count}건)`)
+      ],
+      relatedPosts,
+      actionItems: [
+        `${topTopic} 관련 제품 라인업 검토`,
+        '기술 트렌드에 맞는 R&D 투자',
+        '시장 선점을 위한 마케팅 전략'
+      ]
+    });
   }
+
+  // 5. 커뮤니티 활동 인사이트
   if (topSubreddits.length > 0) {
     keyInsights.push(`활발한 커뮤니티: ${topSubreddits.map(([name, count]) => `r/${name}(${count}건)`).join(', ')}`);
+
+    const topSubreddit = topSubreddits[0][0];
+    const subredditPosts = posts
+      .filter(p => p.subreddit === topSubreddit)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map(p => ({
+        title: p.title.substring(0, 80) + (p.title.length > 80 ? '...' : ''),
+        subreddit: p.subreddit,
+        score: p.score,
+        url: p.url
+      }));
+
+    keyInsightDetails.push({
+      title: `커뮤니티 분석: r/${topSubreddit}`,
+      summary: `r/${topSubreddit}이 가장 활발한 HVAC 관련 커뮤니티입니다. 이 커뮤니티의 의견이 시장 트렌드를 주도합니다.`,
+      details: [
+        `r/${topSubreddit}: ${topSubreddits[0][1]}건 게시물`,
+        ...topSubreddits.slice(1).map(([name, count]) => `r/${name}: ${count}건 게시물`),
+        `총 분석 게시물: ${posts.length}건`
+      ],
+      relatedPosts: subredditPosts,
+      actionItems: [
+        `r/${topSubreddit} 커뮤니티 정기 모니터링`,
+        '주요 인플루언서/전문가 파악',
+        '커뮤니티 피드백 기반 제품 개선'
+      ]
+    });
   }
 
   // 요약 생성
@@ -278,6 +417,7 @@ function performDeepAnalysis(posts: any[]): DailyInsight {
   return {
     summary,
     keyInsights,
+    keyInsightDetails,
     trendingTopics: trendingTopics.length > 0 ? trendingTopics : ['HVAC 시스템', '에너지 효율', '스마트 기술'],
     sentimentAnalysis: {
       overall: `분석 대상 ${posts.length}개 게시물 중 페인포인트 ${Object.keys(painPointCounts).length}개 카테고리, 니즈 ${Object.keys(needCounts).length}개 카테고리 발견`,
